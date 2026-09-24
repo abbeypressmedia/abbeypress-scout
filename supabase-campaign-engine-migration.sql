@@ -21,6 +21,11 @@ alter table public.campaigns
 alter table public.send_events
   add column if not exists claim_token uuid;
 
+-- A prospect can intentionally appear on different uploaded lists.
+alter table public.prospects drop constraint if exists prospects_user_id_email_key;
+drop index if exists public.prospects_user_id_email_key;
+create unique index if not exists prospects_user_list_email_uidx on public.prospects(user_id,list_id,email);
+
 create unique index if not exists send_events_claim_token_uidx
   on public.send_events(claim_token)
   where claim_token is not null;
