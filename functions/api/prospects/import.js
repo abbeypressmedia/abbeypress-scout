@@ -15,7 +15,7 @@ export async function onRequestPost({request,env}){
     records.push({user_id:user.id,list_id:list.id,email,first_name:norm(r.first_name||r.firstName||r["First Name"]),last_name:norm(r.last_name||r.lastName||r["Last Name"]),company:norm(r.company||r.Company),website:norm(r.website||r.Website),status:"ready"});
   }
   for(let i=0;i<records.length;i+=500){
-    const {error}=await sb.from("prospects").upsert(records.slice(i,i+500),{onConflict:"user_id,email",ignoreDuplicates:true});
+    const {error}=await sb.from("prospects").upsert(records.slice(i,i+500),{onConflict:"user_id,list_id,email",ignoreDuplicates:true});
     if(error) throw error;
   }
   const {count}=await sb.from("prospects").select("*",{count:"exact",head:true}).eq("list_id",list.id).eq("status","ready");
