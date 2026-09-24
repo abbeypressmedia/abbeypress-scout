@@ -17,7 +17,7 @@ export async function onRequestGet({request,env}) {
     let links=[],activity=[];
     if(ids.length){
       const [{data:linkData,error:linkError},{data:activityData,error:activityError}]=await Promise.all([
-        sb.from("campaign_senders").select("campaign_id,sender_id,sender_accounts(email)").in("campaign_id",ids).order("sender_order"),
+        sb.from("campaign_senders").select("campaign_id,sender_id,sender_order,sender_accounts(email)").in("campaign_id",ids).order("sender_order"),
         sb.from("send_events").select("id,status,created_at,error,sender_accounts(email),prospects(email),campaigns(name)").eq("user_id",user.id).order("created_at",{ascending:false}).limit(25)
       ]);
       if(linkError) throw linkError;
@@ -33,16 +33,19 @@ export async function onRequestGet({request,env}) {
 
     const senderMap=new Map();
     for(const link of links){
-      const item=senderMap.get(link.campaign_id)||{count:0,emails:[]};
+      const item=senderMap.get(link.campaign_id)||{count:0,emails:[],orders:[]};
       item.count++;
       if(link.sender_accounts?.email) item.emails.push(link.sender_accounts.email);
+      item.orders.push({order:Number(link.sender_order||0),email:link.sender_accounts?.email||"Unknown sender"});
       senderMap.set(link.campaign_id,item);
     }
 
     const enriched=campaigns.map(x=>({
       ...x,
       sender_count:senderMap.get(x.id)?.count||0,
-      sender_emails:senderMap.get(x.id)?.emails||[]
+      sender_emails:senderMap.get(x.id)?.emails||[],
+      sender_rotation:(senderMap.get(x.id)?.orders||[]).sort((a,b)=>a.order-b.order),
+      next_sender_email:(()=>{const m=senderMap.get(x.id);if(!m?.orders?.length)return null;const orders=[...m.orders].sort((a,b)=>a.order-b.order);return orders[(Number(x.next_sender_index)||0)%orders.length]?.email||null;})()
     }));
 
     return json(200,{senders:s.data||[],lists:l.data||[],campaigns:enriched,activity});
