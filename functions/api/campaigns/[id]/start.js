@@ -10,7 +10,7 @@ export async function onRequestPost({request,env,params}){
 
     const [{data:senders,error:se},{data:list,error:le},{data:messages,error:me}]=await Promise.all([
       sb.from("campaign_senders").select("sender_id").eq("campaign_id",params.id),
-      sb.from("prospects").select("id").eq("list_id",c.list_id).eq("status","ready").limit(1),
+      sb.from("prospects").select("id").eq("list_id",c.list_id).in("status",["ready","queued"]).limit(1),
       sb.from("campaign_messages").select("id").eq("campaign_id",params.id).eq("active",true).limit(1)
     ]);
     if(se) throw se;if(le) throw le;if(me) throw me;
