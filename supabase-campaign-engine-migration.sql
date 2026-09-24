@@ -102,7 +102,8 @@ begin
   end if;
 
   select count(*) into pending_count from public.prospects
-  where user_id=p_user_id and list_id=c.list_id and status in ('ready','queued');
+  where user_id=p_user_id and list_id=c.list_id
+    and (status='ready' or (status='queued' and last_campaign_id=c.id));
 
   if pending_count=0 then
     update public.campaigns set status='completed', next_send_at=null, last_error=null, updated_at=now() where id=c.id;
