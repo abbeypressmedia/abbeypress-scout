@@ -6,10 +6,6 @@ export async function onRequestPost({request,env,params}){
     const {data:c,error:ce}=await sb.from("campaigns").select("id,list_id").eq("id",params.id).eq("user_id",user.id).single();
     if(ce||!c) return json(404,{error:"Campaign not found"});
 
-    await sb.from("prospects")
-      .update({status:"ready",claim_token:null,claimed_at:null})
-      .eq("user_id",user.id).eq("list_id",c.list_id).eq("last_campaign_id",c.id).eq("status","queued");
-
     const {error}=await sb.from("campaigns").update({
       status:"stopped",next_send_at:null,last_error:null,updated_at:new Date().toISOString()
     }).eq("id",c.id).eq("user_id",user.id);
