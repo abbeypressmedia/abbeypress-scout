@@ -141,6 +141,7 @@ begin
   set next_sender_index=coalesce((select (cs.sender_order+1)%sender_count from public.campaign_senders cs where cs.campaign_id=c.id and cs.sender_id=s.id limit 1),0),
       next_message_index=case when c.shuffle_messages then c.next_message_index else (c.next_message_index+1)%message_count end,
       next_prospect_offset=c.next_prospect_offset+1,
+      next_send_at=now()+greatest(c.min_delay_seconds,0)*interval '1 second',
       last_error=null, updated_at=now()
   where id=c.id;
 
