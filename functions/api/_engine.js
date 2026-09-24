@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-export const render = (s,p) => String(s||"")
+export const render=(s,p)=>String(s||"")
   .replace(/\{\{\s*first_name\s*\}\}/gi,p.first_name||"")
   .replace(/\{\{\s*last_name\s*\}\}/gi,p.last_name||"")
   .replace(/\{\{\s*company\s*\}\}/gi,p.company||"")
@@ -24,7 +24,11 @@ async function accessToken(env,refreshToken){
 
 async function sendGmail(env,refreshToken,to,subject,body){
   const token=await accessToken(env,refreshToken);
-  const r=await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({raw:raw(to,subject,body)})});
+  const r=await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",{
+    method:"POST",
+    headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+    body:JSON.stringify({raw:raw(to,subject,body)})
+  });
   const data=await r.json().catch(()=>({}));
   if(!r.ok){
     const reason=data.error?.errors?.[0]?.reason||data.error?.status||"gmail_error";
@@ -39,7 +43,7 @@ const isRetryable=e=>[429,500,502,503,504].includes(e?.status);
 const isPermanent=e=>e?.status===400||e?.status===404;
 
 function delaySeconds(c){
-  const min=Math.max(0,Number(c.min_delay_seconds??60));
+  const min=Math.max(30,Number(c.min_delay_seconds??60));
   const max=Math.max(min,Number(c.max_delay_seconds??min));
   return max===min?min:Math.floor(min+Math.random()*(max-min+1));
 }
@@ -61,7 +65,9 @@ async function finalize(sb,args){
 }
 
 export async function processCampaign(sb,env,campaignId,userId){
-  const {data:campaign,error:campaignError}=await sb.from("campaigns").select("id,min_delay_seconds,max_delay_seconds,status").eq("id",campaignId).eq("user_id",userId).single();
+  const {data:campaign,error:campaignError}=await sb.from("campaigns")
+    .select("id,min_delay_seconds,max_delay_seconds,status")
+    .eq("id",campaignId).eq("user_id",userId).single();
   if(campaignError) throw campaignError;
   if(!campaign||campaign.status!=="running") return {status:"idle",campaignId};
 
@@ -69,15 +75,9 @@ export async function processCampaign(sb,env,campaignId,userId){
   if(claimError) throw claimError;
   if(!job) return {status:"idle",campaignId};
 
+  let result;
   try{
-    const result=await sendGmail(env,job.refresh_token,job.prospect_email,render(job.subject,job),render(job.body,job));
-    const finalized=await finalize(sb,{
-      p_claim_token:job.claim_token,p_user_id:userId,p_sender_id:job.sender_id,p_message_id:job.message_id,
-      p_status:"sent",p_provider_message_id:result.id,p_error:null,
-      p_next_send_at:new Date(Date.now()+delaySeconds(campaign)*1000).toISOString(),
-      p_permanent:false,p_auth_failure:false
-    });
-    return {status:finalized?.status||"sent",sender:job.sender_email,prospect:job.prospect_email,messageId:result.id};
+    result=await sendGmail(env,job.refresh_token,job.prospect_email,render(job.subject,job),render(job.body,job));
   }catch(e){
     const authFailure=isAuthFailure(e),retryable=isRetryable(e),permanent=isPermanent(e);
     const retrySeconds=authFailure?0:(retryable?60:120);
@@ -89,4 +89,13 @@ export async function processCampaign(sb,env,campaignId,userId){
     });
     return {status:finalized?.status||"failed",sender:job.sender_email,prospect:job.prospect_email,error:e.message,authFailure,retryable,permanent};
   }
+
+  const finalized=await finalize(sb,{
+    p_claim_token:job.claim_token,p_user_id:userId,p_sender_id:job.sender_id,p_message_id:job.message_id,
+    p_status:"sent",p_provider_message_id:result.id,p_error:null,
+    p_next_send_at:new Date(Date.now()+delaySeconds(campaign)*1000).toISOString(),
+    p_permanent:false,p_auth_failure:false
+  });
+
+  return {status:finalized?.status||"sent",sender:job.sender_email,prospect:job.prospect_email,messageId:result.id};
 }
