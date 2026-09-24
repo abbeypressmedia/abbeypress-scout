@@ -4,13 +4,19 @@ import { createClient } from "@supabase/supabase-js";
 import Papa from "papaparse";
 import "./styles.css";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const configError = !supabaseUrl || !supabaseAnonKey;
-const supabase = configError ? null : createClient(supabaseUrl, supabaseAnonKey);
+let supabase = null;
+
+async function loadSupabase() {
+  const res = await fetch("/api/config", { cache: "no-store" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.supabaseUrl || !body.supabaseAnonKey) {
+    throw new Error(body.error || "Supabase runtime configuration is unavailable.");
+  }
+  supabase = createClient(body.supabaseUrl, body.supabaseAnonKey);
+}
 
 const api = async (path, options = {}) => {
-  if (!supabase) throw new Error("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Cloudflare Pages environment variables, then redeploy.");
+  if (!supabase) throw new Error("Supabase is not configured.");
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(`/api/${path}`, {
     ...options,
@@ -26,12 +32,20 @@ const api = async (path, options = {}) => {
 };
 
 function App() {
-  if (configError) return <ConfigError />;
+  const [ready, setReady] = useState(false);
+  const [configError, setConfigError] = useState("");
+
+  useEffect(() => {
+    loadSupabase().then(() => setReady(true)).catch(e => setConfigError(e.message));
+  }, []);
+
+  if (configError) return <ConfigError message={configError} />;
+  if (!ready) return <div className="auth"><div className="auth-card"><h1>Loading MailFlow…</h1><p>Connecting to the workspace.</p></div></div>;
   return <MailFlowApp />;
 }
 
-function ConfigError() {
-  return <div className="auth"><div className="auth-card"><div className="brand center"><div className="logo">M</div><div><b>MailFlow</b><small>Rotation</small></div></div><h1>Configuration required</h1><p>The site is deployed, but its Supabase environment variables are not configured yet.</p><div className="alert">Add <b>VITE_SUPABASE_URL</b> and <b>VITE_SUPABASE_ANON_KEY</b> under Cloudflare Pages → Settings → Environment variables, then redeploy.</div></div></div>;
+function ConfigError({message}) {
+  return <div className="auth"><div className="auth-card"><div className="brand center"><div className="logo">M</div><div><b>MailFlow</b><small>Rotation</small></div></div><h1>Configuration required</h1><p>The site is deployed, but its Supabase runtime configuration is unavailable.</p><div className="alert">{message}</div></div></div>;
 }
 
 function MailFlowApp() {
