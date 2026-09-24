@@ -1,6 +1,8 @@
 {
   "$schema":"https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name":"abbeypress-scout",
+// wrangler.jsonc
+"name": "abbeypress-scout-scheduler",
   "compatibility_date":"2026-09-22",
   "pages_build_output_dir":"./dist"
 }
