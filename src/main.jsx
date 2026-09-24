@@ -114,7 +114,20 @@ const Panel=({title,children,actions})=><div className="panel"><div className="p
 
 function CampaignProgress({campaign:c}){
   const total=Number(c.prospect_count||0),done=Number(c.sent_count||0)+Number(c.failed_count||0),pct=total?Math.min(100,Math.round(done/total*100)):0;
-  return <div className="campaign-progress"><div className="row"><span><b>{c.name}</b><small>{c.sender_count||0} senders · {c.sender_limit}/sender</small></span><span className={`pill ${c.status}`}>{c.status}</span></div><div className="progress-line"><div style={{width:`${pct}%`}}/></div><small>{done}/{total||"—"} processed · {c.sent_count||0} sent · {c.failed_count||0} failed</small></div>;
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{if(c.status!=="running")return undefined;const t=setInterval(()=>setNow(Date.now()),1000);return ()=>clearInterval(t)},[c.status]);
+  const nextAt=c.next_send_at?new Date(c.next_send_at).getTime():0;
+  const seconds=Math.max(0,Math.ceil((nextAt-now)/1000));
+  const rotation=c.sender_rotation||[];
+  return <div className="campaign-progress">
+    <div className="row"><span><b>{c.name}</b><small>{c.sender_count||0} senders · {c.sender_limit}/sender</small></span><span className={`pill ${c.status}`}>{c.status}</span></div>
+    <div className="progress-line"><div style={{width:`${pct}%`}}/></div>
+    <div className="campaign-meta"><span>{done}/{total||"—"} processed · {c.sent_count||0} sent · {c.failed_count||0} failed</span>{c.status==="running"&&nextAt&&<span>{seconds>0?"Next send in "+seconds+"s":"Sending soon…"}</span>}</div>
+    {rotation.length>0&&<div className="rotation-line"><span><b>Rotation:</b> {rotation.map((x,i)=><React.Fragment key={x.email}>{i>0&&" → "}{x.email}</React.Fragment>)}</span>{c.status==="running"&&c.next_sender_email&&<span><b>Next:</b> {c.next_sender_email}</span>}</div>}
+    {c.status==="completed"&&<div className="campaign-state success">Campaign completed</div>}
+    {c.status==="paused"&&<div className="campaign-state">Campaign paused — resume when ready.</div>}
+    {c.status==="stopped"&&<div className="campaign-state">Campaign stopped.</div>}
+  </div>;
 }
 
 function Senders({data,refresh}){
