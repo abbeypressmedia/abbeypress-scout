@@ -2,6 +2,7 @@
 -- This does NOT recreate or delete any existing table.
 
 alter table public.sender_accounts
+  alter column refresh_token drop not null,
   add column if not exists sent_today_date date not null default current_date,
   add column if not exists lease_until timestamptz;
 
