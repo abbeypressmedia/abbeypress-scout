@@ -1,24 +1,23 @@
-# Abbey Press Scout
+# Abbey Press Cloudflare
 
-Cloudflare Pages + Pages Functions deployment for the MailFlow Rotation SaaS.
+Cloudflare Pages/Functions version of the MailFlow Rotation SaaS.
 
-## Cloudflare Pages setup
-Use **Git integration** with this GitHub repository and branch `main`.
+## Architecture
+- React + Vite frontend
+- Cloudflare Pages static hosting
+- Cloudflare Pages Functions under `functions/api`
+- Supabase Auth/Postgres
+- Gmail OAuth + Gmail REST API
+- Persistent sender rotation and campaign state
 
-- Root directory: `/`
-- Build command: `npm run build`
-- Build output directory: `dist`
-- Do **not** use `wrangler deploy` as a custom deploy command. Cloudflare Pages Git integration handles the deployment.
-- Functions live in `functions/api` and are detected by Pages.
+## Cloudflare deployment
+Build command: `npm run build`
+Build output: `dist`
+Functions directory: `functions`
 
-## Environment variables
-Add these in Cloudflare Pages > Settings > Environment variables for Production (and Preview when needed):
-
-Browser configuration:
+Configure these variables/secrets in Cloudflare Pages:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-
-Server secrets:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GOOGLE_CLIENT_ID`
@@ -26,17 +25,19 @@ Server secrets:
 - `GOOGLE_REDIRECT_URI`
 - `APP_URL`
 
-The two `VITE_` values are intentionally public browser configuration. Never expose the service-role key or Google client secret in source control or browser code.
-
-## Existing Supabase project
-This app uses the existing Supabase project already configured for the application. Do not create a new Supabase project or rerun the database schema just for this deployment.
+The two VITE variables are browser configuration values. Do not mark them as secrets. Keep the service role key and Google client secret encrypted.
 
 ## Google OAuth
-After Cloudflare gives the Pages production URL, set:
-`GOOGLE_REDIRECT_URI=https://YOUR-PROJECT.pages.dev/api/gmail-callback`
-`APP_URL=https://YOUR-PROJECT.pages.dev`
+Set the Google OAuth redirect URI to:
+`https://YOUR-CLOUDFLARE-DOMAIN/api/gmail-callback`
 
-The exact redirect URI must also be registered in the existing Google OAuth client.
+## Worker
+`/api/send-worker` performs one queue tick. A scheduler should invoke it with an authenticated service-to-service mechanism in production. Do not expose an unauthenticated worker endpoint.
 
-## Important
-The sender queue must respect provider limits. Production sending also requires durable queue locking/idempotency, unsubscribe/suppression, bounce/complaint handling, audit logging, and OAuth/privacy/terms requirements before public launch.
+## Production hardening
+- Encrypt refresh tokens at rest.
+- Use a durable queue/lock/idempotency strategy so concurrent workers cannot send the same prospect twice.
+- Add unsubscribe/suppression and bounce/complaint handling.
+- Add audit logging.
+- Add OAuth verification, privacy policy and terms before public launch.
+- Keep provider limits and anti-abuse requirements intact.
