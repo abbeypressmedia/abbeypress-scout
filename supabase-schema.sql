@@ -5,13 +5,15 @@ create table if not exists public.sender_accounts (
   user_id uuid not null references auth.users(id) on delete cascade,
   email text not null,
   google_subject text not null,
-  refresh_token text not null,
+  refresh_token text,
   status text not null default 'connected' check (status in ('connected','reauthorization_required','disconnected')),
   daily_limit integer not null default 200 check (daily_limit > 0),
   sent_today integer not null default 0 check (sent_today >= 0),
   last_sent_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  sent_today_date date not null default current_date,
+  lease_until timestamptz,
   unique(user_id, google_subject)
 );
 
@@ -37,8 +39,10 @@ create table if not exists public.prospects (
   status text not null default 'ready' check (status in ('ready','queued','sent','failed','skipped','archived')),
   contacted_at timestamptz,
   last_campaign_id uuid,
+  claim_token uuid,
+  claimed_at timestamptz,
   created_at timestamptz not null default now(),
-  unique(user_id, email)
+  unique(user_id, list_id, email)
 );
 
 create table if not exists public.campaigns (
@@ -53,6 +57,13 @@ create table if not exists public.campaigns (
   next_sender_index integer not null default 0,
   next_message_index integer not null default 0,
   next_prospect_offset bigint not null default 0,
+  shuffle_messages boolean not null default true,
+  next_send_at timestamptz,
+  last_sent_at timestamptz,
+  last_error text,
+  sent_count integer not null default 0,
+  failed_count integer not null default 0,
+  prospect_count integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -83,6 +94,7 @@ create table if not exists public.send_events (
   status text not null check (status in ('sent','failed','skipped')),
   provider_message_id text,
   error text,
+  claim_token uuid,
   created_at timestamptz not null default now()
 );
 
@@ -108,3 +120,9 @@ create policy "own events" on public.send_events for all using (auth.uid() = use
 
 create index if not exists prospects_ready_idx on public.prospects(user_id, status, id);
 create index if not exists events_campaign_idx on public.send_events(campaign_id, created_at desc);
+
+create unique index if not exists send_events_claim_token_uidx on public.send_events(claim_token) where claim_token is not null;
+create index if not exists prospects_campaign_claim_idx on public.prospects(list_id,status,claimed_at,id);
+create index if not exists sender_lease_idx on public.sender_accounts(status,lease_until,sent_today_date,sent_today);
+
+-- The campaign engine functions are installed by supabase-campaign-engine-migration.sql.
