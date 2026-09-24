@@ -119,19 +119,15 @@ function CampaignProgress({campaign:c}){
 
 function Senders({data,refresh}){
   const [saving,setSaving]=useState(null);
-  const save=async(id,limit)=>{
-    setSaving(id);
-    try{await api(`senders/${id}`,{method:"PATCH",body:JSON.stringify({dailyLimit:Number(limit)})});await refresh(true);}
-    catch(e){alert(e.message)}
-    finally{setSaving(null)}
-  };
-  return <section><Panel title="Connected Gmail accounts"><p className="muted">Connect each Gmail account once. Campaigns can then choose exactly which accounts are part of that campaign.</p>{data.senders.length===0&&<div className="empty">No Gmail accounts connected yet.</div>}{data.senders.map(s=><SenderCard key={s.id} sender={s} saving={saving===s.id} save={save}/>)}</Panel></section>;
+  const save=async(id,limit)=>{setSaving(id);try{await api(`senders/${id}`,{method:"PATCH",body:JSON.stringify({dailyLimit:Number(limit)})});await refresh(true)}catch(e){alert(e.message)}finally{setSaving(null)}};
+  const disconnect=async id=>{if(!confirm("Disconnect this Gmail account? Existing send history will be kept."))return;try{await api(`senders/${id}`,{method:"DELETE"});await refresh()}catch(e){alert(e.message)}};
+  return <section><Panel title="Connected Gmail accounts"><p className="muted">Connections stay in your workspace until you disconnect them. Disconnecting keeps campaign history intact.</p>{data.senders.length===0&&<div className="empty">No Gmail accounts connected yet.</div>}{data.senders.map(s=><SenderCard key={s.id} sender={s} saving={saving===s.id} save={save} disconnect={disconnect}/>)}</Panel></section>;
 }
 
-function SenderCard({sender:s,saving,save}){
+function SenderCard({sender:s,saving,save,disconnect}){
   const [limit,setLimit]=useState(s.daily_limit);
   const pct=Math.min(100,s.daily_limit?s.sent_today/s.daily_limit*100:0);
-  return <div className="sender-card"><div><b>{s.email}</b><span className={`muted status-${s.status}`}>{s.status}</span></div><div className="meter"><div style={{width:`${pct}%`}}/></div><div><b>{s.sent_today}/{s.daily_limit}</b><small>sent today</small></div><label className="limit-input">Daily cap<input type="number" min="1" max="500" value={limit} onChange={e=>setLimit(e.target.value)}/><button className="ghost small" disabled={saving} onClick={()=>save(s.id,limit)}>{saving?"Saving…":"Save"}</button></label></div>;
+  return <div className="sender-card"><div><b>{s.email}</b><span className={`muted status-${s.status}`}>{s.status}</span></div><div className="meter"><div style={{width:`${pct}%`}}/></div><div><b>{s.sent_today}/{s.daily_limit}</b><small>sent today</small></div><div className="sender-actions"><label className="limit-input">Daily cap<input type="number" min="1" max="500" value={limit} onChange={e=>setLimit(e.target.value)}/></label><button className="ghost small" disabled={saving} onClick={()=>save(s.id,limit)}>{saving?"Saving…":"Save"}</button><button className="danger ghost small" onClick={()=>disconnect(s.id)}>Disconnect</button></div></div>;
 }
 
 function Prospects({data,refresh}){
@@ -168,7 +164,7 @@ function Campaigns({data,refresh}){
   return <section><div className="grid2"><Panel title="Create campaign">
     <input placeholder="Campaign name" value={name} onChange={e=>setName(e.target.value)}/>
     <select value={listId} onChange={e=>setListId(e.target.value)}><option value="">Select prospect list</option>{data.lists.filter(l=>l.active_count>0).map(l=><option value={l.id} key={l.id}>{l.name} ({l.active_count} ready)</option>)}</select>
-    <div className="form-grid"><label>Per-sender cap<input type="number" value={limit} min="1" max="500" onChange={e=>setLimit(e.target.value)}/></label><label>Min delay (sec)<input type="number" value={minDelay} min="0" max="3600" onChange={e=>setMinDelay(e.target.value)}/></label><label>Max delay (sec)<input type="number" value={maxDelay} min={minDelay} max="3600" onChange={e=>setMaxDelay(e.target.value)}/></label></div>
+    <div className="form-grid"><label>Per-sender cap<input type="number" value={limit} min="1" max="500" onChange={e=>setLimit(e.target.value)}/></label><label>Min delay (sec)<input type="number" value={minDelay} min="30" max="3600" onChange={e=>setMinDelay(e.target.value)}/></label><label>Max delay (sec)<input type="number" value={maxDelay} min={minDelay} max="3600" onChange={e=>setMaxDelay(e.target.value)}/></label></div>
     <label className="check"><input type="checkbox" checked={shuffle} onChange={e=>setShuffle(e.target.checked)}/> Shuffle message variations</label>
     <h3>Send with these Gmail accounts</h3><div className="sender-picker">{data.senders.map(s=><label className="sender-option" key={s.id}><input type="checkbox" checked={selected.includes(s.id)} onChange={()=>toggle(s.id)} disabled={s.status!=="connected"}/><span>{s.email}<small>{s.sent_today}/{s.daily_limit} today · {s.status}</small></span></label>)}</div>
     <h3>Message variations</h3>{messages.map((m,i)=><div className="message-box" key={i}><div className="row-title"><b>Variation {i+1}</b>{messages.length>1&&<button className="link danger-link" onClick={()=>setMessages(x=>x.filter((_,n)=>n!==i))}>Remove</button>}</div><input placeholder={`Subject ${i+1}`} value={m.subject} onChange={e=>updateMessage(i,"subject",e.target.value)}/><textarea placeholder="Message body" value={m.body} onChange={e=>updateMessage(i,"body",e.target.value)}/><div className="muted">Placeholders: {{first_name}}, {{last_name}}, {{company}}, {{website}}, {{email}}</div></div>)}
