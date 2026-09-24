@@ -18,7 +18,7 @@ export async function onRequestDelete({request,env,params}){
   try{
     const {sb,user}=await getUser(request,env);
     const {data,error}=await sb.from("sender_accounts").update({
-      status:"disconnected",lease_until:null,updated_at:new Date().toISOString()
+      status:"disconnected",refresh_token:null,lease_until:null,updated_at:new Date().toISOString()
     }).eq("id",params.id).eq("user_id",user.id).select("id,email,status").single();
     if(error) throw error;
     return json(200,{ok:true,sender:data});
