@@ -15,10 +15,11 @@ export async function onRequestPost({request,env,params}){
     }).eq("id",c.id).eq("user_id",user.id);
 
     if(error) throw error;
-    await sb.from("sender_accounts").update({lease_until:null,updated_at:new Date().toISOString()}).in(
-      "id",
-      (await sb.from("campaign_senders").select("sender_id").eq("campaign_id",c.id)).data?.map(x=>x.sender_id)||[]
-    );
+    const {data:links}=await sb.from("campaign_senders").select("sender_id").eq("campaign_id",c.id);
+    const senderIds=(links||[]).map(x=>x.sender_id);
+    if(senderIds.length){
+      await sb.from("sender_accounts").update({lease_until:null,updated_at:new Date().toISOString()}).in("id",senderIds);
+    }
 
     return json(200,{ok:true});
   }catch(e){return json(e.message==="Unauthorized"?401:500,{error:e.message});}
