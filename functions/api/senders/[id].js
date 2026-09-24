@@ -17,8 +17,10 @@ export async function onRequestPatch({request,env,params}){
 export async function onRequestDelete({request,env,params}){
   try{
     const {sb,user}=await getUser(request,env);
-    const {error}=await sb.from("sender_accounts").delete().eq("id",params.id).eq("user_id",user.id);
+    const {data,error}=await sb.from("sender_accounts").update({
+      status:"disconnected",lease_until:null,updated_at:new Date().toISOString()
+    }).eq("id",params.id).eq("user_id",user.id).select("id,email,status").single();
     if(error) throw error;
-    return json(200,{ok:true});
+    return json(200,{ok:true,sender:data});
   }catch(e){return json(e.message==="Unauthorized"?401:500,{error:e.message});}
 }
