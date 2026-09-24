@@ -7,6 +7,9 @@ export async function onRequestPost({request,env,params}){
     const {data:c,error:ce}=await sb.from("campaigns").select("id,list_id,status").eq("id",params.id).eq("user_id",user.id).single();
     if(ce||!c) return json(404,{error:"Campaign not found"});
     if(c.status==="stopped"||c.status==="completed") return json(400,{error:"This campaign cannot be resumed. Create a new campaign for the list."});
+    const {data:otherRunning,error:oe}=await sb.from("campaigns").select("id,name").eq("user_id",user.id).eq("list_id",c.list_id).eq("status","running").neq("id",params.id).limit(1);
+    if(oe) throw oe;
+    if(otherRunning?.length) return json(400,{error:"Another campaign is already running on this prospect list. Pause or stop it first."});
 
     const [{data:senders,error:se},{data:list,error:le},{data:messages,error:me}]=await Promise.all([
       sb.from("campaign_senders").select("sender_id").eq("campaign_id",params.id),
