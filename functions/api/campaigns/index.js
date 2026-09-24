@@ -10,12 +10,12 @@ export async function onRequestPost({request,env}){
 
     const cleanName=String(name||"").trim();
     const limit=Number(senderLimit);
-    const minDelay=Math.max(0,Number(minDelaySeconds));
+    const minDelay=Math.max(30,Number(minDelaySeconds));
     const maxDelay=Math.max(minDelay,Number(maxDelaySeconds));
 
     if(!cleanName||!listId) return json(400,{error:"Campaign name and prospect list are required"});
     if(!Number.isInteger(limit)||limit<1||limit>500) return json(400,{error:"Per-sender cap must be between 1 and 500"});
-    if(minDelay>3600||maxDelay>3600) return json(400,{error:"Delay must be 0 to 3600 seconds"});
+    if(minDelay>3600||maxDelay>3600) return json(400,{error:"Delay must be between 30 and 3600 seconds"});
     if(!Array.isArray(senderIds)||senderIds.length===0) return json(400,{error:"Select at least one Gmail sender"});
     const cleanMessages=messages.filter(m=>String(m?.subject||"").trim()&&String(m?.body||"").trim());
     if(!cleanMessages.length) return json(400,{error:"At least one complete message variation is required"});
