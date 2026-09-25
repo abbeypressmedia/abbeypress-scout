@@ -87,7 +87,7 @@ async function finalize(sb,args){
     const {data,error}=await sb.rpc("finalize_campaign_job",args);
     if(!error) return data;
     lastError=error;
-    if(attempt===0) await scheduler.wait(500);
+    if(attempt===0) await new Promise(resolve=>setTimeout(resolve,500));
   }
   throw lastError;
 }
