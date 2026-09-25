@@ -1,5 +1,3 @@
-const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-
 async function tick(env){
   const response=await fetch(`${env.APP_URL}/api/internal/cron-tick`,{
     method:"POST",
@@ -17,17 +15,17 @@ export default {
       return;
     }
 
-    // Run sequential passes so a due campaign does not have to wait
-    // for the next one-minute cron boundary. Each pass processes campaigns
-    // one job at a time; this does not send campaigns concurrently.
-    for(let pass=0;pass<3;pass++){
+    // Keep one scheduled invocation alive for the minute and re-check
+    // due campaigns every 10 seconds. Database claim/lease locking keeps
+    // each individual send sequential and idempotent.
+    for(let pass=0;pass<6;pass++){
       try{
         await tick(env);
-        console.log(`Campaign scheduler pass ${pass+1} OK`);
+        console.log(`Campaign scheduler pass ${pass+1}/6 OK`);
       }catch(e){
-        console.error(`Campaign scheduler pass ${pass+1} failed`,e);
+        console.error(`Campaign scheduler pass ${pass+1}/6 failed`,e);
       }
-      if(pass<2) await wait(20000);
+      if(pass<5) await scheduler.wait(10000);
     }
   }
 };
