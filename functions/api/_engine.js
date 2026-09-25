@@ -77,6 +77,16 @@ function delaySeconds(c){
   return max===min?min:Math.floor(min+Math.random()*(max-min+1));
 }
 
+export async function verifySenderConnection(env,refreshToken){
+  const token=await accessToken(env,refreshToken);
+  const r=await fetch("https://openidconnect.googleapis.com/v1/userinfo",{
+    headers:{Authorization:`Bearer ${token}`}
+  });
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok||!data.email) throw errorWithMeta(data.error_description||data.error||"Google connection verification failed",r.status||502,"verification_failed");
+  return {email:data.email,subject:data.sub||null};
+}
+
 export async function makeServiceClient(env){
   if(!env.SUPABASE_URL||!env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase server configuration is missing");
   return createClient(env.SUPABASE_URL,env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
