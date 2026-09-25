@@ -83,6 +83,7 @@ function MailFlowApp(){
         {tab==="senders"&&<Senders data={data} refresh={refresh}/>}
         {tab==="prospects"&&<Prospects data={data} refresh={refresh}/>}
         {tab==="campaigns"&&<Campaigns data={data} refresh={refresh}/>}
+        {tab==="ai"&&<AICopy/>}
       </>}
     </main>
   </div>;
