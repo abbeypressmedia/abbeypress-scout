@@ -1,5 +1,5 @@
-import { getUser, json } from "../../../_auth.js";
-import { processCampaign } from "../../../_engine.js";
+import { getUser, json } from "../../_auth.js";
+import { processCampaign } from "../../_engine.js";
 
 export async function onRequestPost({request,env,params}){
   try{
