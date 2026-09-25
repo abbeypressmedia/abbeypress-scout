@@ -85,6 +85,15 @@ begin
   where user_id=p_user_id and list_id=c.list_id and status='queued'
     and last_campaign_id=c.id and claimed_at < now()-interval '10 minutes';
 
+  select count(*) into pending_count from public.prospects
+  where user_id=p_user_id and list_id=c.list_id
+    and (status='ready' or (status='queued' and last_campaign_id=c.id));
+
+  if pending_count=0 then
+    update public.campaigns set status='completed', next_send_at=null, last_error=null, updated_at=now() where id=c.id;
+    return null;
+  end if;
+
   select sa.* into s
   from public.campaign_senders cs
   join public.sender_accounts sa on sa.id=cs.sender_id
@@ -98,16 +107,29 @@ begin
   for update of sa skip locked;
 
   if not found then
-    update public.campaigns set next_send_at=now()+interval '1 minute', last_error='No selected sender is currently available', updated_at=now() where id=c.id;
-    return null;
-  end if;
+    if not exists (
+      select 1
+      from public.campaign_senders cs
+      join public.sender_accounts sa on sa.id=cs.sender_id
+      where cs.campaign_id=c.id
+        and sa.user_id=p_user_id
+        and sa.status='connected'
+        and sa.sent_today < least(sa.daily_limit,c.sender_limit)
+    ) then
+      update public.campaigns
+      set status='paused',
+          next_send_at=null,
+          last_error='All selected senders have reached their configured daily/campaign limits',
+          updated_at=now()
+      where id=c.id;
+      return null;
+    end if;
 
-  select count(*) into pending_count from public.prospects
-  where user_id=p_user_id and list_id=c.list_id
-    and (status='ready' or (status='queued' and last_campaign_id=c.id));
-
-  if pending_count=0 then
-    update public.campaigns set status='completed', next_send_at=null, last_error=null, updated_at=now() where id=c.id;
+    update public.campaigns
+    set next_send_at=now()+interval '10 seconds',
+        last_error='Selected sender is temporarily busy; retrying',
+        updated_at=now()
+    where id=c.id;
     return null;
   end if;
 
@@ -160,6 +182,8 @@ begin
   );
 end;
 $$;
+
+
 
 revoke execute on function public.claim_campaign_job(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.claim_campaign_job(uuid, uuid) to service_role;
