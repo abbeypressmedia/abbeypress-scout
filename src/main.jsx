@@ -133,16 +133,17 @@ function CampaignProgress({campaign:c}){
 }
 
 function Senders({data,refresh}){
-  const [saving,setSaving]=useState(null);
+  const [saving,setSaving]=useState(null),[verifying,setVerifying]=useState(null);
   const save=async(id,limit)=>{setSaving(id);try{await api(`senders/${id}`,{method:"PATCH",body:JSON.stringify({dailyLimit:Number(limit)})});await refresh(true)}catch(e){alert(e.message)}finally{setSaving(null)}};
+  const verify=async id=>{setVerifying(id);try{const r=await api(`senders/${id}/verify`,{method:"POST"});alert(`Gmail connection verified: ${r.email}`);await refresh(true)}catch(e){alert(e.message)}finally{setVerifying(null)}};
   const disconnect=async id=>{if(!confirm("Disconnect this Gmail account? Existing send history will be kept."))return;try{await api(`senders/${id}`,{method:"DELETE"});await refresh()}catch(e){alert(e.message)}};
-  return <section><Panel title="Connected Gmail accounts"><p className="muted">Connections stay in your workspace until you disconnect them. Disconnecting keeps campaign history intact.</p>{data.senders.length===0&&<div className="empty">No Gmail accounts connected yet.</div>}{data.senders.map(s=><SenderCard key={s.id} sender={s} saving={saving===s.id} save={save} disconnect={disconnect}/>)}</Panel></section>;
+  return <section><Panel title="Connected Gmail accounts"><p className="muted">Connections stay in your workspace until you disconnect them. Disconnecting keeps campaign history intact.</p>{data.senders.length===0&&<div className="empty">No Gmail accounts connected yet.</div>}{data.senders.map(s=><SenderCard key={s.id} sender={s} saving={saving===s.id} save={save} disconnect={disconnect} verifying={verifying===s.id} onVerify={verify}/>)}</Panel></section>;
 }
 
-function SenderCard({sender:s,saving,save,disconnect}){
+function SenderCard({sender:s,saving,save,disconnect,verifying,onVerify}){
   const [limit,setLimit]=useState(s.daily_limit);
   const pct=Math.min(100,s.daily_limit?s.sent_today/s.daily_limit*100:0);
-  return <div className="sender-card"><div><b>{s.email}</b><span className={`muted status-${s.status}`}>{s.status}</span></div><div className="meter"><div style={{width:`${pct}%`}}/></div><div><b>{s.sent_today}/{s.daily_limit}</b><small>sent today</small></div><div className="sender-actions"><label className="limit-input">Daily cap<input type="number" min="1" max="500" value={limit} onChange={e=>setLimit(e.target.value)}/></label><button className="ghost small" disabled={saving} onClick={()=>save(s.id,limit)}>{saving?"Saving…":"Save"}</button><button className="danger ghost small" onClick={()=>disconnect(s.id)}>Disconnect</button></div></div>;
+  return <div className="sender-card"><div><b>{s.email}</b><span className={`muted status-${s.status}`}>{s.status}</span></div><div className="meter"><div style={{width:`${pct}%`}}/></div><div><b>{s.sent_today}/{s.daily_limit}</b><small>sent today</small></div><div className="sender-actions"><label className="limit-input">Daily cap<input type="number" min="1" max="500" value={limit} onChange={e=>setLimit(e.target.value)}/></label><button className="ghost small" disabled={saving} onClick={()=>save(s.id,limit)}>{saving?"Saving…":"Save"}</button><button className="ghost small" disabled={verifying} onClick={()=>onVerify(s.id)}>{verifying?"Checking…":"Verify"}</button><button className="danger ghost small" onClick={()=>disconnect(s.id)}>Disconnect</button></div></div>;
 }
 
 function Prospects({data,refresh}){
