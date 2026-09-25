@@ -11,6 +11,7 @@ async function loadSupabase(){
   const body=await res.json().catch(()=>({}));
   if(!res.ok||!body.supabaseUrl||!body.supabaseAnonKey) throw new Error(body.error||"Supabase runtime configuration is unavailable.");
   supabase=createClient(body.supabaseUrl,body.supabaseAnonKey);
+  window.__MAILFLOW_BUILD__=body.buildVersion||"unknown";
 }
 
 const api=async(path,options={})=>{
@@ -43,6 +44,7 @@ function ConfigError({message}){
 
 function MailFlowApp(){
   const [session,setSession]=useState(null),[tab,setTab]=useState("dashboard"),[data,setData]=useState({senders:[],lists:[],campaigns:[],activity:[]}),[loading,setLoading]=useState(true);
+  const [buildVersion]=useState(()=>window.__MAILFLOW_BUILD__||"unknown");
   const [authMode,setAuthMode]=useState("login"),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[error,setError]=useState("");
 
   const refresh=async(silent=false)=>{
@@ -71,7 +73,7 @@ function MailFlowApp(){
     <aside className="sidebar">
       <div className="brand"><div className="logo">M</div><div><b>MailFlow</b><small>Rotation</small></div></div>
       <nav>{[["dashboard","Dashboard"],["senders","Gmail Senders"],["prospects","Prospects"],["campaigns","Campaigns"]].map(([id,label])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}>{label}</button>)}</nav>
-      <div className="side-bottom"><button onClick={()=>supabase.auth.signOut()}>Sign out</button></div>
+      <div className="side-bottom"><small className="build-badge">Build {buildVersion}</small><button onClick={()=>supabase.auth.signOut()}>Sign out</button></div>
     </aside>
     <main className="main">
       <header><div><span className="eyebrow">Workspace</span><h1>{tab[0].toUpperCase()+tab.slice(1)}</h1></div><button className="primary" onClick={async()=>{try{const x=await api("gmail-start");location.href=x.url}catch(e){setError(e.message)}}}>+ Connect Gmail</button></header>
@@ -173,7 +175,13 @@ function Campaigns({data,refresh}){
     }catch(e){alert(e.message)}
     finally{setBusy(false)}
   };
-  const action=async(id,type)=>{try{await api(`campaigns/${id}/${type}`,{method:"POST"});await refresh()}catch(e){alert(e.message)}};
+  const action=async(id,type)=>{
+    try{
+      const result=await api(`campaigns/${id}/${type}`,{method:"POST"});
+      await refresh();
+      if(type==="worker"&&result?.status==="waiting") alert(`The campaign is paced. Next send is due at ${new Date(result.nextSendAt).toLocaleTimeString()}.`);
+    }catch(e){alert(e.message)}
+  };
   return <section><div className="grid2"><Panel title="Create campaign">
     <input placeholder="Campaign name" value={name} onChange={e=>setName(e.target.value)}/>
     <select value={listId} onChange={e=>setListId(e.target.value)}><option value="">Select prospect list</option>{data.lists.filter(l=>l.active_count>0).map(l=><option value={l.id} key={l.id}>{l.name} ({l.active_count} ready)</option>)}</select>
@@ -184,7 +192,7 @@ function Campaigns({data,refresh}){
     <button className="ghost" onClick={()=>setMessages(x=>[...x,{subject:"",body:""}])}>+ Add message variation</button>
     {activeList&&<div className="preview-note">This campaign will start with <b>{activeList.active_count}</b> ready prospects and <b>{selected.length}</b> selected senders.</div>}
     <button className="primary full" disabled={busy} onClick={create}>{busy?"Creating…":"Create campaign"}</button>
-  </Panel><Panel title="Existing campaigns">{data.campaigns.length===0&&<div className="empty">No campaigns yet.</div>}{data.campaigns.map(c=><div className="campaign-card" key={c.id}><CampaignProgress campaign={c}/><div className="campaign-actions">{c.status==="draft"&&<button className="primary small" onClick={()=>action(c.id,"start")}>Start sending</button>}{c.status==="running"&&<><button className="ghost small" onClick={()=>action(c.id,"pause")}>Pause</button><button className="danger ghost small" onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="paused"&&<><button className="primary small" onClick={()=>action(c.id,"start")}>Resume</button><button className="danger ghost small" onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="stopped"&&<span className="muted">Stopped</span>}</div>{c.last_error&&<div className="campaign-error">{c.last_error}</div>}</div>)}</Panel></div></section>;
+  </Panel><Panel title="Existing campaigns">{data.campaigns.length===0&&<div className="empty">No campaigns yet.</div>}{data.campaigns.map(c=><div className="campaign-card" key={c.id}><CampaignProgress campaign={c}/><div className="campaign-actions">{c.status==="draft"&&<button className="primary small" onClick={()=>action(c.id,"start")}>Start sending</button>}{c.status==="running"&&<><button className="ghost small" onClick={()=>action(c.id,"worker")}>Run worker now</button><button className="ghost small" onClick={()=>action(c.id,"pause")}>Pause</button><button className="danger ghost small" onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="paused"&&<><button className="primary small" onClick={()=>action(c.id,"start")}>Resume</button><button className="danger ghost small" onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="stopped"&&<span className="muted">Stopped</span>}</div>{c.last_error&&<div className="campaign-error">{c.last_error}</div>}</div>)}</Panel></div></section>;
 }
 
 function Activity({items}){
