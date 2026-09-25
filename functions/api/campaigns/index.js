@@ -4,7 +4,7 @@ export async function onRequestPost({request,env}){
   try{
     const {sb,user}=await getUser(request,env);
     const {
-      name,listId,senderLimit=200,minDelaySeconds=60,maxDelaySeconds=90,
+      name,listId,senderLimit=200,minDelaySeconds=30,maxDelaySeconds=45,
       shuffleMessages=true,senderIds=[],messages=[]
     }=await request.json();
 
