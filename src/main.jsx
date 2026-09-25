@@ -124,7 +124,7 @@ function CampaignProgress({campaign:c}){
   return <div className="campaign-progress">
     <div className="row"><span><b>{c.name}</b><small>{c.sender_count||0} senders · {c.sender_limit}/sender</small></span><span className={`pill ${c.status}`}>{c.status}</span></div>
     <div className="progress-line"><div style={{width:`${pct}%`}}/></div>
-    <div className="campaign-meta"><span>{done}/{total||"—"} processed · {c.sent_count||0} sent · {c.failed_count||0} failed</span>{c.status==="running"&&nextAt&&<span>{seconds>0?"Next send in "+seconds+"s":"Worker processing…"}</span>}</div>
+    <div className="campaign-meta"><span>{done}/{total||"—"} processed · {c.sent_count||0} sent · {c.failed_count||0} failed</span>{c.status==="running"&&nextAt&&<span>{seconds>0?"Next send in "+seconds+"s":"Send due — worker will process it"}</span>}</div>
     {rotation.length>0&&<div className="rotation-line"><span><b>Rotation:</b> {rotation.map((x,i)=><React.Fragment key={x.email}>{i>0&&" → "}{x.email}</React.Fragment>)}</span>{c.status==="running"&&c.next_sender_email&&<span><b>Next:</b> {c.next_sender_email}</span>}</div>}
     {c.status==="completed"&&<div className="campaign-state success">Campaign completed</div>}
     {c.status==="paused"&&<div className="campaign-state">Campaign paused — resume when ready.</div>}
