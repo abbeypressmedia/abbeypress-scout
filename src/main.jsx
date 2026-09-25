@@ -158,7 +158,7 @@ function Prospects({data,refresh}){
 }
 
 function Campaigns({data,refresh}){
-  const [name,setName]=useState(""),[listId,setListId]=useState(""),[limit,setLimit]=useState(200),[minDelay,setMinDelay]=useState(60),[maxDelay,setMaxDelay]=useState(90),[shuffle,setShuffle]=useState(true),[selected,setSelected]=useState([]),[messages,setMessages]=useState([{subject:"Quick question",body:"Hi {{first_name}},\n\nI was looking at {{company}} and wanted to ask a quick question."}]),[busy,setBusy]=useState(false);
+  const [name,setName]=useState(""),[listId,setListId]=useState(""),[limit,setLimit]=useState(200),[minDelay,setMinDelay]=useState(30),[maxDelay,setMaxDelay]=useState(45),[shuffle,setShuffle]=useState(true),[selected,setSelected]=useState([]),[messages,setMessages]=useState([{subject:"Quick question",body:"Hi {{first_name}},\n\nI was looking at {{company}} and wanted to ask a quick question."}]),[busy,setBusy]=useState(false);
   useEffect(()=>{if(selected.length===0&&data.senders.length)setSelected(data.senders.map(s=>s.id));},[data.senders.length]);
   const activeList=data.lists.find(l=>l.id===listId);
   const toggle=id=>setSelected(x=>x.includes(id)?x.filter(v=>v!==id):[...x,id]);
