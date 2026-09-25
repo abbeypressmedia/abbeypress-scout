@@ -67,8 +67,9 @@ async function sendGmail(env,refreshToken,to,subject,body){
 }
 
 const isAuthFailure=e=>e?.status===401||e?.code==="invalid_grant"||e?.code==="missing_refresh_token"||/invalid_grant|invalid authentication|invalid credentials|refresh token/i.test(e?.message||"");
-const isRetryable=e=>[403,429,500,502,503,504].includes(e?.status)||!e?.status;
-const isPermanent=e=>e?.status===400||e?.status===404;
+const isQuota403=e=>e?.status===403&&/rateLimitExceeded|userRateLimitExceeded|dailyLimitExceeded|quota/i.test(e?.code||e?.message||"");
+const isRetryable=e=>[429,500,502,503,504].includes(e?.status)||isQuota403(e)||!e?.status;
+const isPermanent=e=>e?.status===400||e?.status===404||(e?.status===403&&!isQuota403(e));
 
 function delaySeconds(c){
   const min=Math.max(30,Number(c.min_delay_seconds??30));
