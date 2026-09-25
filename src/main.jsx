@@ -72,7 +72,7 @@ function MailFlowApp(){
   return <div className="app">
     <aside className="sidebar">
       <div className="brand"><div className="logo">M</div><div><b>MailFlow</b><small>Rotation</small></div></div>
-      <nav>{[["dashboard","Dashboard"],["senders","Gmail Senders"],["prospects","Prospects"],["campaigns","Campaigns"]].map(([id,label])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}>{label}</button>)}</nav>
+      <nav>{[["dashboard","Dashboard"],["senders","Gmail Senders"],["prospects","Prospects"],["campaigns","Campaigns"],["ai","AI Copy"]].map(([id,label])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}>{label}</button>)}</nav>
       <div className="side-bottom"><small className="build-badge">Build {buildVersion}</small><button onClick={()=>supabase.auth.signOut()}>Sign out</button></div>
     </aside>
     <main className="main">
@@ -198,6 +198,29 @@ function Campaigns({data,refresh}){
     <div className="delay-note">Gmail pacing is intentionally conservative. Live sending starts at 30 seconds minimum; use shorter intervals only in a non-sending test/simulation environment.</div>
     <button className="primary full" disabled={busy} onClick={create}>{busy?"Creating…":"Create campaign"}</button>
   </Panel><Panel title="Existing campaigns">{data.campaigns.length===0&&<div className="empty">No campaigns yet.</div>}{data.campaigns.map(c=><div className="campaign-card" key={c.id}><CampaignProgress campaign={c}/><div className="campaign-actions">{c.status==="draft"&&<button className="primary small" onClick={()=>action(c.id,"start")}>Start sending</button>}{c.status==="running"&&<><button className="ghost small" disabled={working===`${c.id}:worker`} onClick={()=>action(c.id,"worker")}>{working===`${c.id}:worker`?"Sending…":"Run worker now"}</button><button className="ghost small" disabled={working===`${c.id}:pause`} onClick={()=>action(c.id,"pause")}>Pause</button><button className="danger ghost small" disabled={working===`${c.id}:stop`} onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="paused"&&<><button className="primary small" disabled={working===`${c.id}:start`} onClick={()=>action(c.id,"start")}>Resume</button><button className="danger ghost small" disabled={working===`${c.id}:stop`} onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="stopped"&&<span className="muted">Stopped</span>}</div>{c.last_error&&<div className="campaign-error">{c.last_error}</div>}</div>)}</Panel></div></section>;
+}
+
+function AICopy(){
+  const [mode,setMode]=useState("generate"),[idea,setIdea]=useState(""),[subject,setSubject]=useState(""),[draft,setDraft]=useState(""),[busy,setBusy]=useState(false),[result,setResult]=useState(null);
+  const run=async()=>{
+    setBusy(true);setResult(null);
+    try{
+      const body=mode==="generate"?{mode,idea}:{mode,subject,draft};
+      const r=await api("ai/copy",{method:"POST",body:JSON.stringify(body)});
+      setResult(r.result);
+    }catch(e){alert(e.message)}
+    finally{setBusy(false)}
+  };
+  return <section><div className="grid2">
+    <Panel title="Independent AI copy assistant">
+      <p className="muted">Stateless by design: it only sees what you submit in this request. It is not connected to campaign memory or sender history.</p>
+      <div className="campaign-actions"><button className={mode==="generate"?"primary small":"ghost small"} onClick={()=>setMode("generate")}>Generate</button><button className={mode==="review"?"primary small":"ghost small"} onClick={()=>setMode("review")}>Review</button></div>
+      {mode==="generate"?<><label>Outreach idea<textarea value={idea} onChange={e=>setIdea(e.target.value)} placeholder="Example: introduce our website conversion audit to ecommerce founders who recently launched a new store."/></label></>:<><input placeholder="Subject (optional)" value={subject} onChange={e=>setSubject(e.target.value)}/><label>Draft<textarea value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Paste the message you want reviewed."/></label></>}
+      <button className="primary" disabled={busy} onClick={run}>{busy?"Thinking…":mode==="generate"?"Generate compliant draft":"Review draft"}</button>
+      <p className="muted">The assistant focuses on relevance, honesty, clarity, and reducing spam-like patterns. It does not provide spam-filter bypass tactics.</p>
+    </Panel>
+    <Panel title="Result">{!result?<div className="empty">Your result will appear here.</div>:<><input value={result.subject||""} readOnly/><textarea value={result.body||""} readOnly/><div className="row"><span><b>Risk level</b><small>{result.issues?.length?result.issues.join(" · "):"No major issues reported."}</small></span><span className="pill">{result.risk_level||"unknown"}</span></div>{result.improvements?.length>0&&<div className="preview-note"><b>Improvements:</b> {result.improvements.join(" · ")}</div>}</>}</Panel>
+  </div></section>;
 }
 
 function Activity({items}){
