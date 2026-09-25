@@ -10,9 +10,10 @@ export async function onRequestPost({request,env}){
     const sb=await makeServiceClient(env);
     const today=new Date().toISOString().slice(0,10);
 
-    await sb.from("sender_accounts")
+    const {error:resetError}=await sb.from("sender_accounts")
       .update({sent_today:0,sent_today_date:today,lease_until:null,updated_at:new Date().toISOString()})
       .lt("sent_today_date",today);
+    if(resetError) throw resetError;
 
     const {data:campaigns,error}=await sb.from("campaigns")
       .select("id,user_id")
@@ -31,7 +32,13 @@ export async function onRequestPost({request,env}){
       }
     }
 
-    return json(200,{ok:true,processed:results.length,results});
+    const failures=results.filter(x=>x.status==="error");
+    return json(failures.length?500:200,{
+      ok:failures.length===0,
+      processed:results.length,
+      failed:failures.length,
+      results
+    });
   }catch(e){
     return json(500,{error:e.message});
   }
