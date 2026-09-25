@@ -11,21 +11,24 @@ async function tick(env){
 export default {
   async scheduled(controller,env){
     if(!env.APP_URL||!env.CRON_SECRET){
-      console.error("Scheduler is missing APP_URL or CRON_SECRET");
-      return;
+      throw new Error("Scheduler is missing APP_URL or CRON_SECRET");
     }
 
-    // Keep one scheduled invocation alive for the minute and re-check
-    // due campaigns every 10 seconds. Database claim/lease locking keeps
-    // each individual send sequential and idempotent.
+    let successfulPasses=0;
+    let lastError=null;
+
     for(let pass=0;pass<6;pass++){
       try{
-        await tick(env);
-        console.log(`Campaign scheduler pass ${pass+1}/6 OK`);
+        const body=await tick(env);
+        successfulPasses++;
+        console.log(`Campaign scheduler pass ${pass+1}/6 OK`,body);
       }catch(e){
+        lastError=e;
         console.error(`Campaign scheduler pass ${pass+1}/6 failed`,e);
       }
       if(pass<5) await scheduler.wait(10000);
     }
+
+    if(successfulPasses===0&&lastError) throw lastError;
   }
 };
