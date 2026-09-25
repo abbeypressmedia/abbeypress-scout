@@ -175,12 +175,15 @@ function Campaigns({data,refresh}){
     }catch(e){alert(e.message)}
     finally{setBusy(false)}
   };
+  const [working,setWorking]=useState(null);
   const action=async(id,type)=>{
+    setWorking(`${id}:${type}`);
     try{
       const result=await api(`campaigns/${id}/${type}`,{method:"POST"});
-      await refresh();
+      await refresh(true);
       if(type==="worker"&&result?.status==="waiting") alert(`The campaign is paced. Next send is due at ${new Date(result.nextSendAt).toLocaleTimeString()}.`);
     }catch(e){alert(e.message)}
+    finally{setWorking(null)}
   };
   return <section><div className="grid2"><Panel title="Create campaign">
     <input placeholder="Campaign name" value={name} onChange={e=>setName(e.target.value)}/>
@@ -191,8 +194,9 @@ function Campaigns({data,refresh}){
     <h3>Message variations</h3>{messages.map((m,i)=><div className="message-box" key={i}><div className="row-title"><b>Variation {i+1}</b>{messages.length>1&&<button className="link danger-link" onClick={()=>setMessages(x=>x.filter((_,n)=>n!==i))}>Remove</button>}</div><input placeholder={`Subject ${i+1}`} value={m.subject} onChange={e=>updateMessage(i,"subject",e.target.value)}/><textarea placeholder="Message body" value={m.body} onChange={e=>updateMessage(i,"body",e.target.value)}/><div className="muted">{"Placeholders: {{first_name}}, {{last_name}}, {{company}}, {{website}}, {{email}}"}</div></div>)}
     <button className="ghost" onClick={()=>setMessages(x=>[...x,{subject:"",body:""}])}>+ Add message variation</button>
     {activeList&&<div className="preview-note">This campaign will start with <b>{activeList.active_count}</b> ready prospects and <b>{selected.length}</b> selected senders.</div>}
+    <div className="delay-note">Gmail pacing is intentionally conservative. Live sending starts at 30 seconds minimum; use shorter intervals only in a non-sending test/simulation environment.</div>
     <button className="primary full" disabled={busy} onClick={create}>{busy?"Creating…":"Create campaign"}</button>
-  </Panel><Panel title="Existing campaigns">{data.campaigns.length===0&&<div className="empty">No campaigns yet.</div>}{data.campaigns.map(c=><div className="campaign-card" key={c.id}><CampaignProgress campaign={c}/><div className="campaign-actions">{c.status==="draft"&&<button className="primary small" onClick={()=>action(c.id,"start")}>Start sending</button>}{c.status==="running"&&<><button className="ghost small" onClick={()=>action(c.id,"worker")}>Run worker now</button><button className="ghost small" onClick={()=>action(c.id,"pause")}>Pause</button><button className="danger ghost small" onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="paused"&&<><button className="primary small" onClick={()=>action(c.id,"start")}>Resume</button><button className="danger ghost small" onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="stopped"&&<span className="muted">Stopped</span>}</div>{c.last_error&&<div className="campaign-error">{c.last_error}</div>}</div>)}</Panel></div></section>;
+  </Panel><Panel title="Existing campaigns">{data.campaigns.length===0&&<div className="empty">No campaigns yet.</div>}{data.campaigns.map(c=><div className="campaign-card" key={c.id}><CampaignProgress campaign={c}/><div className="campaign-actions">{c.status==="draft"&&<button className="primary small" onClick={()=>action(c.id,"start")}>Start sending</button>}{c.status==="running"&&<><button className="ghost small" disabled={working===`${c.id}:worker`} onClick={()=>action(c.id,"worker")}>{working===`${c.id}:worker`?"Sending…":"Run worker now"}</button><button className="ghost small" disabled={working===`${c.id}:pause`} onClick={()=>action(c.id,"pause")}>Pause</button><button className="danger ghost small" disabled={working===`${c.id}:stop`} onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="paused"&&<><button className="primary small" disabled={working===`${c.id}:start`} onClick={()=>action(c.id,"start")}>Resume</button><button className="danger ghost small" disabled={working===`${c.id}:stop`} onClick={()=>action(c.id,"stop")}>Stop</button></>}{c.status==="stopped"&&<span className="muted">Stopped</span>}</div>{c.last_error&&<div className="campaign-error">{c.last_error}</div>}</div>)}</Panel></div></section>;
 }
 
 function Activity({items}){
